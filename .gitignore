@@ -31,3 +31,6 @@ Thumbs.db
 *.mps
 *.sol
 *.log
+
+# Generated project outputs
+outputs/
