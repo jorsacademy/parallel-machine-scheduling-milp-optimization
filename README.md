@@ -2,29 +2,30 @@
 
 This project demonstrates a medium-level **identical parallel machine scheduling** problem solved with a **Mixed-Integer Linear Programming (MILP)** model in Python.
 
-The goal is to assign a set of independent jobs to parallel machines so that the **makespan** — the maximum workload assigned to any machine — is minimized.
+The objective is to assign a set of independent jobs to identical parallel machines so that the **makespan** — the largest total workload assigned to any machine — is minimized.
+
+The project includes a modular data layer, MILP model construction, independent solution validation, detailed schedule reporting, and automatic Gantt chart generation.
 
 ## Problem Description
 
-We consider:
+The sample instance contains:
 
 - 12 independent jobs
 - 3 identical parallel machines
-- A deterministic processing time for each job
+- Deterministic processing times
 - No preemption
 - No release dates
+- No precedence constraints
 - No sequence-dependent setup times
 
-Each job must be assigned to exactly one machine.
-
-Because the machines are identical and there are no sequence-dependent effects, the internal ordering of jobs on a machine does not affect the makespan. Therefore, the optimization model focuses on the assignment decision.
+Each job must be assigned to exactly one machine. Since machines are identical and there are no sequence-dependent effects, the order of jobs on an individual machine does not influence the objective value. The MILP therefore optimizes the assignment decisions directly.
 
 ## Mathematical Formulation
 
 ### Sets
 
 - `J`: set of jobs
-- `M`: set of machines
+- `M`: set of identical machines
 
 ### Parameter
 
@@ -32,7 +33,7 @@ Because the machines are identical and there are no sequence-dependent effects, 
 
 ### Decision Variable
 
-- `x_jm = 1` if job `j` is assigned to machine `m`, and `0` otherwise
+- `x_jm = 1` if job `j` is assigned to machine `m`; `0` otherwise
 
 ### Makespan Variable
 
@@ -54,13 +55,13 @@ Each job must be assigned exactly once:
 sum_m x_jm = 1    for every job j
 ```
 
-The workload of every machine must not exceed the makespan:
+The workload of each machine cannot exceed the makespan:
 
 ```text
 sum_j p_j * x_jm <= C_max    for every machine m
 ```
 
-Binary restrictions:
+Binary restriction:
 
 ```text
 x_jm in {0, 1}
@@ -83,15 +84,109 @@ x_jm in {0, 1}
 | J11 | 15 |
 | J12 | 5 |
 
+The total processing time is 132 time units. With three machines, the average-load lower bound is:
+
+```text
+ceil(132 / 3) = 44
+```
+
+The longest job requires 18 time units. Therefore, the standard lower bound is:
+
+```text
+max(44, 18) = 44
+```
+
+If the solver finds a feasible solution with makespan 44, that solution is proven optimal because it reaches the theoretical lower bound.
+
+## Solution Validation
+
+The project does not rely only on the solver status. After optimization, it independently verifies that:
+
+1. Every expected job appears in the schedule.
+2. No job is assigned more than once.
+3. No unknown job appears in the solution.
+4. The reconstructed machine workloads match the optimized makespan.
+5. The makespan is not below a valid theoretical lower bound.
+
+A successful run prints:
+
+```text
+Independent solution validation: PASSED
+```
+
+## Result Reporting
+
+The program prints:
+
+- Input processing-time table
+- CBC solver status
+- Theoretical lower bound
+- Optimal makespan
+- Gap between the lower bound and optimized makespan
+- Machine-level job assignments
+- Machine workloads
+- Start, duration, and completion time for every scheduled job
+
+The within-machine order is generated deterministically for reporting and visualization. It does not change the objective value for this specific scheduling model.
+
+## Gantt Chart
+
+After solving the MILP, the program automatically creates a Gantt chart with Matplotlib.
+
+The generated file is saved as:
+
+```text
+outputs/gantt_chart.png
+```
+
+Each bar represents a scheduled job. The horizontal position indicates the job's start and completion times, while each row represents one machine.
+
+The `outputs/` directory is excluded from Git because it contains generated results.
+
+## Project Structure
+
+```text
+.
+├── data.py
+├── scheduler.py
+├── visualization.py
+├── main.py
+├── requirements.txt
+├── README.md
+├── LICENSE
+└── .gitignore
+```
+
+### `data.py`
+
+Contains the `SchedulingData` data class, sample problem instance, and input-data validation.
+
+### `scheduler.py`
+
+Contains the MILP formulation, CBC solve procedure, schedule extraction, lower-bound calculation, machine-load calculation, and independent solution-validation functions.
+
+### `visualization.py`
+
+Builds deterministic start times from the optimized assignment and creates the Gantt chart.
+
+### `main.py`
+
+Coordinates the complete workflow:
+
+```text
+Data -> MILP Model -> Solver -> Schedule Extraction -> Validation -> Reporting -> Gantt Chart
+```
+
 ## Technologies
 
 - Python 3.10+
 - PuLP
 - CBC MILP Solver
+- Matplotlib
 
 ## Installation
 
-Clone the repository and install the dependency:
+Clone the repository and install the dependencies:
 
 ```bash
 pip install -r requirements.txt
@@ -99,33 +194,35 @@ pip install -r requirements.txt
 
 ## Run
 
+Execute:
+
 ```bash
 python main.py
 ```
 
-The program prints:
-
-- Solver status validation
-- Optimal makespan
-- Job assignments for each machine
-- Total workload of each machine
-
 ## Why This Formulation Is Correct
 
-A common modeling mistake is to introduce completion-time variables indexed by sequence positions without also defining valid sequencing constraints. That creates variables that do not correspond to an actual schedule.
+A common modeling error in parallel-machine scheduling is to introduce completion-time variables indexed by sequence positions without defining a valid sequencing structure. In that case, the sequence index does not represent a real schedule.
 
-This project avoids that error. For the identical parallel machine problem considered here, minimizing the largest machine workload is sufficient to minimize the makespan. The MILP therefore uses only job-to-machine assignment variables and one makespan variable.
+For the problem considered in this repository, completion-time or sequence-position decision variables are unnecessary. There are no release dates, precedence constraints, setup times, or other sequence-dependent effects. Therefore, minimizing the maximum total processing load assigned to any identical machine is equivalent to minimizing the makespan.
 
-## Project Structure
+This produces a compact and mathematically valid MILP formulation.
 
-```text
-.
-├── main.py
-├── README.md
-├── requirements.txt
-├── .gitignore
-└── LICENSE
-```
+## Possible Extensions
+
+The current model is intentionally medium-level and can be extended to include:
+
+- Unrelated or uniform parallel machines
+- Machine-dependent processing times
+- Release dates
+- Job priorities or weights
+- Due dates and tardiness penalties
+- Machine eligibility restrictions
+- Sequence-dependent setup times
+- Precedence constraints
+- Multiple optimization objectives
+
+These extensions require additional decision variables and constraints because sequencing may then affect feasibility or the objective value.
 
 ## License
 
